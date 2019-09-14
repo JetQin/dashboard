@@ -1,9 +1,10 @@
 package io.github.jetqin.config;
 
+import io.github.jetqin.config.props.SecurityProperties;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,11 +21,14 @@ import org.springframework.security.oauth2.provider.token.store.JwtTokenStore;
 import org.springframework.security.oauth2.provider.token.store.KeyStoreKeyFactory;
 
 import javax.sql.DataSource;
-import java.security.KeyPair;
 
 @Configuration
 @EnableAuthorizationServer
 public class AuthorizationServerConfiguration extends AuthorizationServerConfigurerAdapter {
+
+
+    @Autowired
+    SecurityProperties sec;
 
     @Autowired
     DataSource dataSource;
@@ -38,18 +42,6 @@ public class AuthorizationServerConfiguration extends AuthorizationServerConfigu
     @Autowired
     UserDetailsService userDetailsService;
 
-
-    public AuthorizationServerConfiguration(final DataSource dataSource,
-                                            final PasswordEncoder passwordEncoder,
-                                            final AuthenticationManager authenticationManager,
-                                            final SecurityProperties securityProperties,
-                                            final UserDetailsService userDetailsService) {
-        this.dataSource = dataSource;
-        this.passwordEncoder = passwordEncoder;
-        this.authenticationManager = authenticationManager;
-        this.securityProperties = securityProperties;
-        this.userDetailsService = userDetailsService;
-    }
 
     @Bean
     public TokenStore tokenStore() {
@@ -66,15 +58,19 @@ public class AuthorizationServerConfiguration extends AuthorizationServerConfigu
         tokenServices.setAuthenticationManager(this.authenticationManager);
         return tokenServices;
     }
-
+//    generate key pairs
+//    keytool -genkeypair -alias auth
+//                    -keyalg RSA
+//                    -keypass password
+//                    -keystore auth.jks
+//                    -storepass password
     @Bean
     public JwtAccessTokenConverter jwtAccessTokenConverter() {
 
-        SecurityProperties.JwtProperties jwtProperties = securityProperties.getJwt();
-        KeyPair keyPair = keyPair(jwtProperties, keyStoreKeyFactory(jwtProperties));
-
+        KeyStoreKeyFactory keyStoreKeyFactory =
+                new KeyStoreKeyFactory(new ClassPathResource(sec.getKeyStore()), sec.getKeyPassword().toCharArray());
         JwtAccessTokenConverter jwtAccessTokenConverter = new JwtAccessTokenConverter();
-        jwtAccessTokenConverter.setKeyPair(keyPair);
+        jwtAccessTokenConverter.setKeyPair(keyStoreKeyFactory.getKeyPair(sec.getKeyAlias()));
         return jwtAccessTokenConverter;
     }
 
@@ -97,11 +93,4 @@ public class AuthorizationServerConfiguration extends AuthorizationServerConfigu
                 .checkTokenAccess("isAuthenticated()");
     }
 
-    private KeyPair keyPair(SecurityProperties.JwtProperties jwtProperties, KeyStoreKeyFactory keyStoreKeyFactory) {
-        return keyStoreKeyFactory.getKeyPair(jwtProperties.getKeyPairAlias(), jwtProperties.getKeyPairPassword().toCharArray());
-    }
-
-    private KeyStoreKeyFactory keyStoreKeyFactory(SecurityProperties.JwtProperties jwtProperties) {
-        return new KeyStoreKeyFactory(jwtProperties.getKeyStore(), jwtProperties.getKeyStorePassword().toCharArray());
-    }
 }
