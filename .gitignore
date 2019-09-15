@@ -3,3 +3,6 @@
 
 # Ignore Gradle build output directory
 build
+.idea
+auth-service/out
+auth-service/.gradle
